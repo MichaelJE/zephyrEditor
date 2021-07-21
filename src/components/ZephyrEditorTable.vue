@@ -11,12 +11,16 @@
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue } from 'vue-property-decorator';
+import { Component, Vue } from 'vue-property-decorator';
+import { namespace } from 'vuex-class';
+import { ICSVRecord } from '.././shared/types';
 
 import ZephyrEditorRows from './ZephyrEditorRows.vue';
 import ZephyrEditorColumns from './ZephyrEditorColumns.vue';
 import ZephyrEditorCells from './ZephyrEditorCells.vue';
 import ZephyrEditorSpreader from './ZephyrEditorSpreader.vue';
+
+const tableModule = namespace('TableModule');
 
 @Component({
   components: {
@@ -27,8 +31,9 @@ import ZephyrEditorSpreader from './ZephyrEditorSpreader.vue';
   }
 })
 export default class ZephyrEditorTable extends Vue {
-  @Prop() private msg!: string;
-  cols = 60;
-  rows = 10;
+  @tableModule.Getter('getData') public getData!: (csvData: ICSVRecord[]) => void
+
+  cols = 4;
+  rows = 4;
 }
 </script>

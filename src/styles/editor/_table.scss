@@ -1,5 +1,45 @@
 .hrrcn__zephyr {
+  font-size: 13px;
+  color: #222;
+  touch-action: manipulation;
+
   & table {
     border-collapse: collapse;
+    margin: 1rem 0;
+    display: block;
+    overflow-x: auto;
+    border: 1px solid #ccc;
+    &.tableHolder {
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: 0;
+      border-width: 0;
+      table-layout: fixed;
+      width: 0;
+      outline-width: 0;
+      cursor: default;
+      max-width: none;
+      max-height: none;
+      th {
+        background-color: #f0f0f0;
+      }
+      th, td {
+        border-top-width: 0;
+        border-left-width: 0;
+        border-right: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+        height: 22px;
+        empty-cells: show;
+        line-height: 21px;
+        background-attachment: #fff;
+        vertical-align: top;
+        overflow: hidden;
+        white-space: pre-wrap;
+      }
+      td, th, th:last-child {
+        border-right: 1px solid #ccc;
+        border-bottom: 1px solid #ccc;
+      }
+    }
   }
 }

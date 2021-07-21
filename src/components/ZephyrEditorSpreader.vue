@@ -1,9 +1,9 @@
 
 <template>
   <div>
-    <table>
+    <table class="tableHolder">
       <tbody>
-        <tr class="border: 1px solid #000;">
+        <tr>
           <td>&nbsp;</td>
         </tr>
       </tbody>

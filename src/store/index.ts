@@ -1,15 +1,17 @@
 import Vue from 'vue';
-import Vuex from 'vuex';
+import * as Vuex from 'vuex';
+
+import { createStore } from 'vuex-smart-module';
+
+import RootModule from './modules/root';
 
 Vue.use(Vuex);
 
-export default new Vuex.Store({
-  state: {
-  },
-  mutations: {
-  },
-  actions: {
-  },
-  modules: {
+const store = createStore(
+  RootModule,
+  {
+    strict: process.env.NODE_ENV !== 'production'
   }
-});
+);
+
+export default store;
