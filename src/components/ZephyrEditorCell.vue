@@ -1,18 +1,31 @@
 
 <template>
-  <div style="display: flex; pointer-events: none;" :class="{ 'selected': (selected) }">
-    <div style="display: none;"><textarea style="width: 134px; height: 23px; font-size: 13px; font-family: Roboto, Helvetica, Arial, sans-serif; min-width: 134px; max-width: 491px; resize: none; overflow-y: visible;"></textarea></div>
+  <div style="display: flex; pointer-events: none;">
     <span>{{ col }}</span>
   </div>
 </template>
 <script lang="ts">
 import { Vue, Component, Prop } from 'vue-property-decorator';
+import { namespace } from 'vuex-class';
+import { ICell } from '../shared/types';
+
+const tableModule = namespace('TableModule');
 
 @Component
 export default class ZephyrCell extends Vue {
   @Prop() private col: string;
-  @Prop() private collId!: number;
+  @Prop() private colId!: number;
   @Prop() private rowId!: number;
+
+  @tableModule.Getter('getActiveCell') public activeCell!: ICell
+
+  get isCellActive() {
+    this.selected = this.activeCell &&
+           this.activeCell.row === this.rowId &&
+           this.activeCell.column === this.colId;
+
+    return this.selected;
+  }
 
   selected = false;
   current = false;

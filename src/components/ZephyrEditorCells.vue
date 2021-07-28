@@ -13,28 +13,38 @@
             <!-- Might be a separate component -->
             <th style="width: 50px;">&nbsp;</th>
             <td
-              v-for="(col, colKeys) in row.data"
-              :key="colKeys"
-              :ref="`col-${colKeys}`"
-              @mousedown="onSelect"
-              style="width: 50px;"
+              v-for="(col, colKey) in row.data"
+              :key="colKey"
+              :ref="`col-${colKey}`"
+              @mousedown.prevent="onSelect($event, row.row, colKey)"
+              @mousemove.prevent="onDrag($event, row.row, colKey)"
+              @mouseup.prevent="onMouseUp"
+              style="min-width: 50px;"
             >
-              <ZephyrEditorCell :col="col" />
+              <ZephyrEditorCell :col="col" :colId="colKey" :rowId="row.row" />
               <!-- {{ col }} -->
             </td>
           </tr>
         </tbody>
       </table>
-      <div ref="selection" style="z-index: 999; opacity:1; position:absolute; border: 2px solid rgb(75, 137, 255); padding: 0;">
-        <div class="controller"></div>
-      </div>
+      <div ref="selection-top" style="z-index: 999; opacity:1; position:absolute; background-color: rgb(75, 137, 255); padding: 0;"></div>
+      <div ref="selection-bottom" style="z-index: 999; opacity:1; position:absolute; background-color: rgb(75, 137, 255); padding: 0;"></div>
+      <div ref="selection-left" style="z-index: 999; opacity:1; position:absolute; background-color: rgb(75, 137, 255); padding: 0;"></div>
+      <div ref="selection-right" style="z-index: 999; opacity:1; position:absolute; background-color: rgb(75, 137, 255); padding: 0;"></div>
+      <div ref="selection-controller" class="controller"></div>
+      <textarea
+        v-model="selectedContent"
+        @keydown="onCellInterract"
+        ref="form-input"
+        style="display: grid;position: absolute; z-index: 998; padding: 0px 0px 0px 1px; margin: 0; font-size: 13px; font-family: Roboto, Helvetica, Arial, sans-serif; border: none; min-width: 50px; max-width: 500px; resize: none; outline: 0; overflow-y: visible;"
+      ></textarea>
     </div>
   </div>
 </template>
 <script lang="ts">
 import { Vue, Component, Prop, Watch } from 'vue-property-decorator';
 import { namespace } from 'vuex-class';
-import { ICSVRecord, ITableGeometry } from '../shared/types';
+import { ICell, ICSVRecord, ITableGeometry } from '../shared/types';
 
 import ZephyrEditorCell from './ZephyrEditorCell.vue';
 
@@ -50,10 +60,21 @@ export default class ZephyrEditorCells extends Vue {
 
   @Prop() private rows!: number;
 
+  clickTimeout: number;
   clicks = 0;
 
+  selectedContent = '';
+  mouseDownActive = false;
+
+  currentlyActiveNode: HTMLElement;
+
+  // App State
   @tableModule.Getter('getData') public getData!: () => ICSVRecord
+  @tableModule.Getter('getActiveCell') public getActiveCell!: ICell
+
   @tableModule.Action('updateTableGeometry') public updateTableGeometry!: (tableGeom: ITableGeometry) => void
+  @tableModule.Action('activateCell') public activateCell!: (cell: ICell) => void
+  @tableModule.Action('setCellData') public setCellData!: (payload: { row: number; column: number; content: string; }) => void
 
   tableGeometry: ITableGeometry = {
     rowDictionary: {},
@@ -69,6 +90,7 @@ export default class ZephyrEditorCells extends Vue {
           const newRowHeight = (this.$refs[`row-${dataRow.row}`] as Vue & HTMLElement[])[0].getBoundingClientRect().height;
           this.tableGeometry.rowDictionary[dataRow.row] = newRowHeight;
         });
+
         newVal[0].data.forEach((_, key: number) => {
           const newColHeight = (this.$refs[`col-${key}`] as Vue & HTMLElement[])[0].getBoundingClientRect().width;
           this.tableGeometry.colDictionary[key] = newColHeight;
@@ -77,22 +99,111 @@ export default class ZephyrEditorCells extends Vue {
       });
     }
   }
-  /* eslint-disable */
-  onSelect(e: MouseEvent) {
-    const geometry = (e.target as Vue & HTMLElement).getBoundingClientRect();
-    // size
-    (this.$refs.selection as Vue & HTMLElement).style.width = `${ geometry.width - 4 }px`;
-    (this.$refs.selection as Vue & HTMLElement).style.height = `${ geometry.height - 4 }px`;
 
-    // position
-    (this.$refs.selection as Vue & HTMLElement).style.left = `${ geometry.x }px`;
-    (this.$refs.selection as Vue & HTMLElement).style.top = `${ geometry.y }px`;
-
-    this.registerDoubleClick(e);
+  deactivateTextArea() {
+    (this.$refs['form-input'] as Vue & HTMLElement).blur();
+    (this.$refs['form-input'] as Vue & HTMLElement).style.display = 'none';
   }
 
-  registerDoubleClick(e: MouseEvent) {
+  activateTextArea(e: MouseEvent, row: number, column: number) {
+    this.selectedContent = this.getData[this.getActiveCell.row].data[this.getActiveCell.column];
+    const geometry = (e.target as Vue & HTMLElement).getBoundingClientRect();
 
+    (this.$refs['form-input'] as Vue & HTMLElement).style.width = `${geometry.width - 3}px`;
+    (this.$refs['form-input'] as Vue & HTMLElement).style.height = `${geometry.height}px`;
+    (this.$refs['form-input'] as Vue & HTMLElement).style.lineHeight = `${geometry.height - 4}px`;
+
+    (this.$refs['form-input'] as Vue & HTMLElement).style.left = `${geometry.x}px`;
+    (this.$refs['form-input'] as Vue & HTMLElement).style.top = `${geometry.y}px`;
+    (this.$refs['form-input'] as Vue & HTMLElement).style.display = '';
+    (this.$refs['form-input'] as Vue & HTMLElement).focus();
+  }
+
+  onCellInterract(e: KeyboardEvent) {
+    switch (e.keyCode) {
+      case 13:
+        // Enter - Submit the new value straight to the selected active cell
+        this.submitTableData();
+        this.placeMarker(this.currentlyActiveNode.getBoundingClientRect());
+    }
+  }
+
+  submitTableData() {
+    this.setCellData({ row: this.getActiveCell.row, column: this.getActiveCell.column, content: this.selectedContent });
+    this.deactivateTextArea();
+  }
+
+  placeMarker(geometry: DOMRect) {
+    // size
+    (this.$refs['selection-top'] as Vue & HTMLElement).style.width = `${geometry.width - 3}px`;
+    (this.$refs['selection-top'] as Vue & HTMLElement).style.height = '2px';
+
+    // position
+    (this.$refs['selection-top'] as Vue & HTMLElement).style.left = `${geometry.x}px`;
+    (this.$refs['selection-top'] as Vue & HTMLElement).style.top = `${geometry.y}px`;
+
+    // size
+    (this.$refs['selection-right'] as Vue & HTMLElement).style.width = '2px';
+    (this.$refs['selection-right'] as Vue & HTMLElement).style.height = `${geometry.height - 3}px`;
+
+    // position
+    (this.$refs['selection-right'] as Vue & HTMLElement).style.left = `${geometry.x + geometry.width - 3}px`;
+    (this.$refs['selection-right'] as Vue & HTMLElement).style.top = `${geometry.y}px`;
+
+    // size
+    (this.$refs['selection-bottom'] as Vue & HTMLElement).style.width = `${geometry.width - 3}px`;
+    (this.$refs['selection-bottom'] as Vue & HTMLElement).style.height = '2px';
+
+    // position
+    (this.$refs['selection-bottom'] as Vue & HTMLElement).style.left = `${geometry.x}px`;
+    (this.$refs['selection-bottom'] as Vue & HTMLElement).style.top = `${geometry.y + geometry.height - 3}px`;
+
+    // size
+    (this.$refs['selection-left'] as Vue & HTMLElement).style.width = '2px';
+    (this.$refs['selection-left'] as Vue & HTMLElement).style.height = `${geometry.height - 3}px`;
+
+    // position
+    (this.$refs['selection-left'] as Vue & HTMLElement).style.left = `${geometry.x}px`;
+    (this.$refs['selection-left'] as Vue & HTMLElement).style.top = `${geometry.y}px`;
+
+    (this.$refs['selection-controller'] as Vue & HTMLElement).style.left = `${geometry.x + geometry.width - 6}px`;
+    (this.$refs['selection-controller'] as Vue & HTMLElement).style.top = `${geometry.y + geometry.height - 6}px`;
+  }
+
+  /* eslint-disable */
+  onSelect(e: MouseEvent, rowId: number, colId: number) {
+    this.mouseDownActive = true;
+    const geometry = (e.target as Vue & HTMLElement).getBoundingClientRect();
+    this.currentlyActiveNode = (e.target as Vue & HTMLElement);
+    this.placeMarker(geometry);
+    this.registerDoubleClick(e, rowId, colId);
+  }
+
+  onDrag(e: MouseEvent, rowId: number, colId: number) {
+    if (!this.mouseDownActive) return;
+  }
+
+  onMouseUp() {
+    this.mouseDownActive = false;
+  }
+
+  registerDoubleClick(e: MouseEvent, row: number, column: number) {
+    let timeout: number;
+    ++this.clicks;
+    if (this.clicks === 1) {
+      this.deactivateTextArea();
+      this.clickTimeout = setTimeout(() => {
+        this.clicks = 0;
+        clearTimeout(this.clickTimeout);
+        this.clickTimeout = null;
+      }, 700);
+    } else {
+      this.activateCell({ row, column });
+      this.activateTextArea(e, row, column);
+      this.clicks = 0;
+      clearTimeout(this.clickTimeout);
+      this.clickTimeout = null;
+    }
   }
   /* eslint-enable */
 }
@@ -104,7 +215,6 @@ export default class ZephyrEditorCells extends Vue {
   border: 1px solid #fff;
   background-color: rgb(75, 137, 255);
   position: absolute;
-  bottom: -5px;
-  right: -5px;
+  z-index: 999;
 }
 </style>

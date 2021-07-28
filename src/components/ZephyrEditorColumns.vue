@@ -11,6 +11,7 @@
             v-for="(key, value) in cols"
             :key="key"
             :style="`height: 25px; min-width: 50px; width: ${ cellWidth(value) }px;`"
+            :ref="`current-col-${value}`"
           >
             <span>{{ value | alphaSignature }}</span>
           </th>
@@ -20,7 +21,7 @@
   </div>
 </template>
 <script lang="ts">
-import { Vue, Component, Prop } from 'vue-property-decorator';
+import { Vue, Component, Prop, Watch } from 'vue-property-decorator';
 import { namespace } from 'vuex-class';
 import { ITableGeometry } from '../shared/types';
 
@@ -32,8 +33,21 @@ export default class ZephyrEditorColumns extends Vue {
 
   @tableModule.Getter('getTableGeometry') public getTableGeometry!: ITableGeometry
 
+  columnWidth: number;
+
+  @Watch('getTableGeometry', { deep: true })
+  tableGeometry(newVal: ITableGeometry) {
+    if (newVal) {
+      for (let i = 0; i < this.cols; ++i) {
+        const style = (this.$refs[`current-col-${i}`] as Vue & HTMLElement).style;
+        if (this.$refs[`current-col-${i}`] && style) {
+          (this.$refs[`current-col-${i}`] as Vue & HTMLElement).style.width = `${newVal.colDictionary[i] - 3}px`;
+        }
+      }
+    }
+  }
+
   cellWidth(id: number) {
-    console.log(id);
     return (this.getTableGeometry) ? this.getTableGeometry.colDictionary[id] - 3 : null;
   }
 }

@@ -16,7 +16,7 @@
   </div>
 </template>
 <script lang="ts">
-import { Vue, Component, Prop } from 'vue-property-decorator';
+import { Vue, Component, Prop, Watch } from 'vue-property-decorator';
 import { namespace } from 'vuex-class';
 import { ITableGeometry } from '../shared/types';
 
@@ -27,7 +27,14 @@ export default class ZephyrEditorRows extends Vue {
   @Prop({ default: 0 }) private rows!: number;
   @Prop() private colId!: number;
 
+  rowWidth: number;
+
   @tableModule.Getter('getTableGeometry') public getTableGeometry: ITableGeometry
+
+  @Watch('getTableGeometry')
+  tableGeometry(newVal: ITableGeometry) {
+    console.log(newVal);
+  }
 
   cellHeight(id: number) {
     return (this.getTableGeometry) ? this.getTableGeometry.rowDictionary[id] - 3 : 25;
